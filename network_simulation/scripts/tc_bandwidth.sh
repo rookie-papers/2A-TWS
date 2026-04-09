@@ -57,4 +57,12 @@ ip netns exec Verifier tc qdisc add dev veth-vf-ns root tbf \
     burst "$NET_BURST" \
     latency "$NET_LATENCY"
 
+# ================= 5. Configure User Node (UAV) =================
+clean_tc "User" "veth-usr-ns"
+echo " -> Setting User (UAV) bandwidth limit: $NET_BANDWIDTH"
+ip netns exec User tc qdisc add dev veth-usr-ns root tbf \
+    rate "$NET_BANDWIDTH" \
+    burst "$NET_BURST" \
+    latency "$NET_LATENCY"
+
 echo "[SUCCESS] Scenario 2 (Bandwidth Limit) Configuration Complete."

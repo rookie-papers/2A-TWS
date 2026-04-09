@@ -6,49 +6,6 @@ namespace Dtacb {
     csprng rng;
     gmp_randstate_t state_gmp;
 
-    // ================= Hash Functions =================
-
-    ECP H1(ECP c_m) {
-        // 1. Convert commitment c_m to a byte stream and hash it to a scalar
-        octet hash = getOctet(1024);
-        octet temp = getOctet(512);
-        ECP_toOctet(&temp, &c_m, true);
-        concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val); free(temp.val);
-
-        mpz_class h_val = BIG_to_mpz(ret);
-
-        // 2. Map the scalar to a valid curve point h on group G1
-        ECP h;
-        ECP_generator(&h);
-        ECP_mul(h, h_val);
-        return h;
-    }
-
-    mpz_class H2(RandomizedCred cred_prime) {
-        // Hash the randomized credential (CRED') to a scalar in Zp
-        octet hash = getOctet(1024);
-        octet temp = getOctet(512);
-
-        ECP_toOctet(&temp, &cred_prime.CRED_prime_1, true);
-        concatOctet(&hash, &temp);
-
-        ECP_toOctet(&temp, &cred_prime.CRED_prime_2, true);
-        concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val); free(temp.val);
-        return BIG_to_mpz(ret);
-    }
-
     // ================= Core Algorithm =================
 
     DtacbParams Setup(int max_acc_capacity) {
@@ -140,7 +97,8 @@ namespace Dtacb {
         ECP_add(&reg.c_m, &t2);
 
         // 2. Compute base element h = H1(c_m)
-        ECP h = H1(reg.c_m);
+        ECP h;
+        HashToG1(h,reg.c_m);
 
         // 3. Generate User's ElGamal key pair z <- R Zp*, Z = g1^z
         user.z = rand_mpz(state_gmp) % pp.q;
@@ -171,7 +129,8 @@ namespace Dtacb {
         BlindedPartialCred b_cred;
 
         // 0. Verify the validity of the user's registration request
-        ECP h = H1(reg.c_m);
+        ECP h;
+        HashToG1(h,reg.c_m);
         if (!Verify_Theta1(pp, h, reg)) {
             cout << "[Issue] Issuer Error: NIZK Theta 1 verification failed!" << endl;
             return b_cred;
@@ -301,7 +260,7 @@ namespace Dtacb {
         }
 
         // 4. If valid, Judger extracts the unique credential witness \sigma for the accumulator
-        mpz_class sigma = H2(tok.CRED_prime);
+        mpz_class sigma = HashToZp(tok.CRED_prime);
 
         return true;
     }

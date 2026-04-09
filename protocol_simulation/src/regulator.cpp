@@ -54,7 +54,7 @@ namespace RegulatorNode {
             ECP2 PK_U = str_to_ECP2(pk_str);
 
             // Compute H_u = X^{f(rsk, PK_U)}
-            mpz_class hu_val = DatTws::f_hash(opener.rsk, PK_U);
+            mpz_class hu_val = HashToZp(opener.rsk, PK_U);
             ECP H_u;
             ECP_copy(&H_u, &pp.X);
             ECP_mul(H_u, hu_val);

@@ -23,30 +23,6 @@ namespace Dtacb {
         return coeffs;
     }
 
-    mpz_class Hash_Batch(ECP2 CM_P, ECP2 CM_f, ECP Pi_a, ECP Pi_b, ECP T1, ECP T2, FP12 T3) {
-        octet hash = getOctet(4096);
-        octet temp = getOctet(1024);
-
-        // Append G2 elements
-        ECP2* pts_g2[] = {&CM_P, &CM_f};
-        for (int i = 0; i < 2; ++i) { ECP2_toOctet(&temp, pts_g2[i], true); concatOctet(&hash, &temp); }
-
-        // Append G1 elements
-        ECP* pts_g1[] = {&Pi_a, &Pi_b, &T1, &T2};
-        for (int i = 0; i < 4; ++i) { ECP_toOctet(&temp, pts_g1[i], true); concatOctet(&hash, &temp); }
-
-        // Append GT element
-        FP12_toOctet(&temp, &T3);
-        concatOctet(&hash, &temp);
-
-        // Compute hash in Zp
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-        free(hash.val); free(temp.val);
-        return BIG_to_mpz(ret);
-    }
-
     BatchProof ZKBatchShow(DtacbParams& pp, ECP Acc, ECP Pi, const vector<mpz_class>& P_set) {
         BatchProof proof;
         int n = P_set.size();
@@ -120,7 +96,7 @@ namespace Dtacb {
         FP12_reduce(&proof.T3);
 
         // 8. Compute Fiat-Shamir challenge c
-        mpz_class c = Hash_Batch(proof.CM_P, proof.CM_f, proof.Pi_a, proof.Pi_b, proof.T1, proof.T2, proof.T3);
+        mpz_class c = HashToZp(proof.CM_P, proof.CM_f, proof.Pi_a, proof.Pi_b, proof.T1, proof.T2, proof.T3);
 
         // 9. Compute shifted commitments CM and CM^u for degree bounding
         // CM = g_2^{f(s) * c * s^{t-n+1}} * \tilde{g}_2^{j * c * s^{t-n+1}}
@@ -171,7 +147,7 @@ namespace Dtacb {
 
     bool ZKBatchVer(DtacbParams& pp, ECP Acc, BatchProof& pf, int n) {
         // Recompute Fiat-Shamir challenge
-        mpz_class c = Hash_Batch(pf.CM_P, pf.CM_f, pf.Pi_a, pf.Pi_b, pf.T1, pf.T2, pf.T3);
+        mpz_class c = HashToZp(pf.CM_P, pf.CM_f, pf.Pi_a, pf.Pi_b, pf.T1, pf.T2, pf.T3);
 
         // Check 1: Verify T1 correctness
         // T1 ?= Pi_a^{-c} g1^{W_tau1} \tilde{g}_1^{W_tau2}

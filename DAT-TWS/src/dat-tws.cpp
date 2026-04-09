@@ -7,147 +7,6 @@ namespace DatTws {
     csprng rng;
     gmp_randstate_t state_gmp;
 
-// ================= Hash Functions =================
-
-// f: Hash function for Regulator to compute H_u = X^{f(rsk, PK_U)}
-    mpz_class f_hash(mpz_class rsk, ECP2 PK_U) {
-        octet hash = getOctet(2048);
-        octet temp = getOctet(1024);
-
-        // Convert rsk to string/bytes
-        string rsk_str = rsk.get_str(16);
-        temp.len = rsk_str.length();
-        memcpy(temp.val, rsk_str.c_str(), temp.len);
-        concatOctet(&hash, &temp);
-
-        ECP2_toOctet(&temp, &PK_U, true);
-        concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val);
-        free(temp.val);
-
-        return BIG_to_mpz(ret);
-    }
-
-// H1: Hash for T_vk generation
-    mpz_class H1(ECP Xt, ECP2 Yt, FP12 pairing_res) {
-        octet hash = getOctet(2048);
-        octet temp = getOctet(1024);
-
-        ECP_toOctet(&temp, &Xt, true);
-        concatOctet(&hash, &temp);
-
-        ECP2_toOctet(&temp, &Yt, true);
-        concatOctet(&hash, &temp);
-
-        FP12_toOctet(&temp, &pairing_res);
-        concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val);
-        free(temp.val);
-
-        return BIG_to_mpz(ret);
-    }
-
-    // H2: Message signature hash h = H4(msg, Z_x, {T_vk})
-    mpz_class H2(string msg, FP12 hat_Z_x, vector<ECP> T_vks) {
-        octet hash = getOctet(4096);
-        octet temp = getOctet(1024);
-
-        if (msg.length() > 1024) {
-            cout << "Error: Message too long" << endl;
-        } else {
-            temp.len = msg.length();
-            memcpy(temp.val, msg.c_str(), temp.len);
-            concatOctet(&hash, &temp);
-        }
-
-        FP12_toOctet(&temp, &hat_Z_x);
-        concatOctet(&hash, &temp);
-
-        for(auto& tvk : T_vks) {
-            ECP_toOctet(&temp, &tvk, true);
-            concatOctet(&hash, &temp);
-        }
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val);
-        free(temp.val);
-
-        return BIG_to_mpz(ret);
-    }
-
-    // H3: ZK Challenge hash c = H3(K_agg, H', sigma', R)
-    mpz_class H3(ECP2 K_agg, ECP H_prime, ECP sigma_prime, FP12 R) {
-        octet hash = getOctet(2048);
-        octet temp = getOctet(1024);
-
-        ECP2_toOctet(&temp, &K_agg, true);
-        concatOctet(&hash, &temp);
-
-        ECP_toOctet(&temp, &H_prime, true);
-        concatOctet(&hash, &temp);
-
-        ECP_toOctet(&temp, &sigma_prime, true);
-        concatOctet(&hash, &temp);
-
-        FP12_toOctet(&temp, &R);
-        concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val);
-        free(temp.val);
-
-        return BIG_to_mpz(ret);
-    }
-
-    // H_Tag: Tag hash m_i = H(Tag)
-    mpz_class H_Tag(const DatTag& tag) {
-        octet hash = getOctet(2048);
-        octet temp = getOctet(1024);
-
-        mpzToOctet(tag.T_exp);
-        concatOctet(&hash, &temp);
-
-        ECP_toOctet(&temp, (ECP*)&tag.X_t, true);
-        concatOctet(&hash, &temp);
-
-        ECP2_toOctet(&temp, (ECP2*)&tag.Y_t_tilde, true);
-        concatOctet(&hash, &temp);
-
-        ECP_toOctet(&temp, (ECP*)&tag.T_vk, true);
-        concatOctet(&hash, &temp);
-
-        ECP2_toOctet(&temp, (ECP2*)&tag.A_tilde, true);
-        concatOctet(&hash, &temp);
-
-        ECP2_toOctet(&temp, (ECP2*)&tag.B_tilde, true);
-        concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val);
-        free(temp.val);
-
-        return BIG_to_mpz(ret);
-    }
-
 // ================= Core Algorithm =================
 
     DatParams Setup() {
@@ -213,7 +72,7 @@ namespace DatTws {
         FP12 pair_val = e(PK_R_t, user.PK_U);
 
         // T_vk = X^h1
-        mpz_class h1 = H1(tag.X_t, tag.Y_t_tilde, pair_val);
+        mpz_class h1 = HashToZp(tag.X_t, tag.Y_t_tilde, pair_val);
         ECP_copy(&tag.T_vk, &pp.X);
         ECP_mul(tag.T_vk, h1);
 
@@ -229,7 +88,7 @@ namespace DatTws {
         DatWitness wit;
 
         // 1. Regulator computes H_u = f(rsk, PK_U)
-        mpz_class h_u_val = f_hash(opener.rsk, user.PK_U);
+        mpz_class h_u_val = HashToZp(opener.rsk, user.PK_U);
         ECP H_u;
         ECP_copy(&H_u, &pp.X);
         ECP_mul(H_u, h_u_val); // H_u = X^{f(rsk, PK_U)}
@@ -238,7 +97,7 @@ namespace DatTws {
         ECP_copy(&user.H, &H_u);
 
         // 2. Issuer computes certificate sigma_i = H_u^{a_i + b_i * H_Tag(T_i)}
-        mpz_class m = H_Tag(tag);
+        mpz_class m = HashToZp(tag);
         mpz_class sig_exp = (issuer.a + issuer.b * m) % pp.q;
 
         ECP sigma_i;
@@ -279,7 +138,7 @@ namespace DatTws {
         ECP2 K_agg;
         ECP2_inf(&K_agg);
         for(int i=0; i<n; ++i) {
-            mpz_class m_i = H_Tag(user.tags[i]);
+            mpz_class m_i = HashToZp(user.tags[i]);
             ECP2 temp;
             ECP2_copy(&temp, &user.tags[i].B_tilde);
             ECP2_mul(temp, m_i);
@@ -322,7 +181,7 @@ namespace DatTws {
         FP12_pow(sig.R, k);
 
         // Challenge c & Response s
-        mpz_class c = H3(K_agg, sig.H_prime, sig.sigma_prime, sig.R);
+        mpz_class c = HashToZp(K_agg, sig.H_prime, sig.sigma_prime, sig.R);
         mpz_class prod = (c * t) % pp.q;
         sig.s = (k + prod) % pp.q;
 
@@ -340,7 +199,7 @@ namespace DatTws {
         for(auto& tag : user.tags) T_vks.push_back(tag.T_vk);
 
         // h = H4(msg, Z_x, {T_vk})
-        mpz_class h = H2(msg, sig.hat_Z_x, T_vks);
+        mpz_class h = HashToZp(msg, sig.hat_Z_x, T_vks);
 
         // sigma_x = (prod T_sk)^{h*x} * X^x
 
@@ -401,7 +260,7 @@ namespace DatTws {
         ECP2 K_agg;
         ECP2_inf(&K_agg);
         for(int i=0; i<n; ++i) {
-            mpz_class m_i = H_Tag(tags[i]);
+            mpz_class m_i = HashToZp(tags[i]);
             ECP2 temp;
             ECP2_copy(&temp, &tags[i].B_tilde);
             ECP2_mul(temp, m_i);
@@ -421,7 +280,7 @@ namespace DatTws {
 
         FP12 hat_F = e(sig.H_prime, pp.Y_tilde);
 
-        mpz_class c = H3(K_agg, sig.H_prime, sig.sigma_prime, sig.R);
+        mpz_class c = HashToZp(K_agg, sig.H_prime, sig.sigma_prime, sig.R);
 
         FP12 LHS; FP12_copy(&LHS, &hat_F); FP12_pow(LHS, sig.s);
         FP12 RHS; FP12_copy(&RHS, &hat_E); FP12_pow(RHS, c);
@@ -441,7 +300,7 @@ namespace DatTws {
         vector<ECP> T_vks;
         for(auto& tag : tags) T_vks.push_back(tag.T_vk);
 
-        mpz_class h = H2(msg, sig.hat_Z_x, T_vks);
+        mpz_class h = HashToZp(msg, sig.hat_Z_x, T_vks);
 
         // 3.2 Compute LHS: e(sigma_x, Y)
         FP12 LHS_sig = e(sig.sigma_x, pp.Y_tilde);
@@ -507,7 +366,7 @@ namespace DatTws {
         vector<ECP> T_vks;
         for(auto& tag : tags) T_vks.push_back(tag.T_vk);
 
-        mpz_class h = H2(msg, sig.hat_Z_x, T_vks);
+        mpz_class h = HashToZp(msg, sig.hat_Z_x, T_vks);
 
         // 1.2 Compute LHS: e(sigma_x, Y)
         FP12 LHS_sig = e(sig.sigma_x, pp.Y_tilde);
@@ -567,7 +426,7 @@ namespace DatTws {
             // A. Reconstruct K_agg_j for the j-th user
             ECP2 K_agg; ECP2_inf(&K_agg);
             for(auto& tag : all_tags[j]) {
-                mpz_class m_i = H_Tag(tag);
+                mpz_class m_i = HashToZp(tag);
                 ECP2 temp; ECP2_copy(&temp, &tag.B_tilde);
                 ECP2_mul(temp, m_i);
                 ECP2_add(&temp, &tag.A_tilde);
@@ -576,7 +435,7 @@ namespace DatTws {
             ECP2_affine(&K_agg);
 
             // B. Verifier MUST recompute the challenge c_j to prevent forgery
-            mpz_class c_j = H3(K_agg, sigs[j].H_prime, sigs[j].sigma_prime, sigs[j].R);
+            mpz_class c_j = HashToZp(K_agg, sigs[j].H_prime, sigs[j].sigma_prime, sigs[j].R);
 
             // C. Precompute combined scalars
             mpz_class s_delta = (sigs[j].s * deltas[j]) % pp.q;
@@ -669,7 +528,7 @@ namespace DatTws {
             }
 
             // Compute h_j = H2(msg, Z_x, {T_vk})
-            mpz_class h_j = H2(msgs[j], sigs[j].hat_Z_x, T_vks);
+            mpz_class h_j = HashToZp(msgs[j], sigs[j].hat_Z_x, T_vks);
 
             // Compute scalar multiplier: delta_j * h_j
             mpz_class h_delta = (h_j * deltas[j]) % pp.q;

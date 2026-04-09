@@ -28,6 +28,10 @@ namespace AtoSa {
         // H function is implemented as a method
     } AtoSaParams;
 
+    inline void appendToOctet(octet* hash, const AtoSaParams& tag) {
+        hash_recursive(hash, tag.p, tag.P, tag.P_hat);
+    }
+
     /**
      * @brief Secret Key (sk) structure.
      * Contains the private components sk = (x, y1, y2).
@@ -48,6 +52,10 @@ namespace AtoSa {
         ECP2 X_hat;     ///< Public key component X_hat = P_hat ^ x.
     } AtoSaVK;
 
+    inline void appendToOctet(octet* hash, const AtoSaVK& tag) {
+        hash_recursive(hash, tag.Y1_hat, tag.Y2_hat, tag.X_hat);
+    }
+
     /**
      * @brief Auxiliary Tag Information (aux) structure.
      * Holds the randomness and hash used during tag generation.
@@ -57,6 +65,10 @@ namespace AtoSa {
         mpz_class rho2;     ///< Random scalar rho2.
         ECP h;              ///< Hash value h = H(c) in G1.
     } AtoSaAux;
+
+    inline void appendToOctet(octet* hash, const AtoSaAux& tag) {
+        hash_recursive(hash, tag.rho1, tag.rho2, tag.h);
+    }
 
     /**
      * @brief Tag (T) structure.
@@ -170,31 +182,6 @@ namespace AtoSa {
      * @param nu The random scalar used for randomization.
      */
     void RandSigTag(AtoSaVK vk, AtoSaTag& tag, string msg, AtoSaSignature& sig, const mpz_class& nu);
-
-
-    // ------------------------------
-    // Helper Functions
-    // ------------------------------
-
-    /**
-     * @brief Hash function mapping commitment c to a point in G1.
-     * Computes h = H(c) -> G1.
-     * @param pp System public parameters.
-     * @param part1 First part of commitment (ECP).
-     * @param part2 Second part of commitment (ECP).
-     * @param msgs Vector of messages involved in the commitment.
-     * @param vks Vector of Verification Keys involved in the commitment.
-     * @return The resulting point in G1.
-     */
-    ECP HashToG1(AtoSaParams pp, ECP part1, ECP part2, const vector<string>& msgs, const vector<AtoSaVK>& vks);
-
-    /**
-     * @brief Hash function mapping a string message to an integer in Zp.
-     * @param msg The message string to hash.
-     * @return The resulting large integer (mpz_class) in Zp.
-     */
-    mpz_class HashMsgToZp(string msg);
-
 } // namespace AtoSa
 
 #endif // ATO_SA_H

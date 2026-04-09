@@ -3,28 +3,6 @@
 
 namespace Dtacb {
 
-    // ---------------- NIZK Theta 1 ----------------
-
-    // Dedicated hash function for Theta 1 proof using the Fiat-Shamir heuristic
-    mpz_class Hash_Theta1(ECP Z, ECP c_m, ECP C1, ECP C2, ECP R_Z, ECP R_cm, ECP R_C1, ECP R_C2) {
-        octet hash = getOctet(4096);
-        octet temp = getOctet(512);
-
-        // Append all public parameters and commitments to the hash stream
-        ECP* points[] = {&Z, &c_m, &C1, &C2, &R_Z, &R_cm, &R_C1, &R_C2};
-        for (int i = 0; i < 8; ++i) {
-            ECP_toOctet(&temp, points[i], true);
-            concatOctet(&hash, &temp);
-        }
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val); free(temp.val);
-        return BIG_to_mpz(ret);
-    }
-
     NIZK_Theta1 Prove_Theta1(DtacbParams& pp, ECP h, mpz_class z, mpz_class m, mpz_class l, mpz_class o, RegInfo& reg) {
         NIZK_Theta1 proof;
 
@@ -54,7 +32,7 @@ namespace Dtacb {
         ECP_add(&R_C2, &t2);
 
         // 3. Compute Fiat-Shamir challenge c
-        proof.c = Hash_Theta1(reg.Z, reg.c_m, reg.C1, reg.C2, R_Z, R_cm, R_C1, R_C2);
+        proof.c = HashToZp(reg.Z, reg.c_m, reg.C1, reg.C2, R_Z, R_cm, R_C1, R_C2);
 
         // 4. Compute zero-knowledge responses: s_i = (r_i - c * x_i) mod q
         auto calc_s = [&](mpz_class r, mpz_class x) {
@@ -104,40 +82,13 @@ namespace Dtacb {
         ECP_add(&R_C2_prime, &t6);
 
         // 2. Recompute the challenge hash and verify equality
-        mpz_class c_prime = Hash_Theta1(reg.Z, reg.c_m, reg.C1, reg.C2, R_Z_prime, R_cm_prime, R_C1_prime, R_C2_prime);
+        mpz_class c_prime = HashToZp(reg.Z, reg.c_m, reg.C1, reg.C2, R_Z_prime, R_cm_prime, R_C1_prime, R_C2_prime);
 
         return c_prime == p.c;
     }
 
 
     // ---------------- NIZK Theta 2 ----------------
-
-    // Dedicated hash function for Theta 2 proof using the Fiat-Shamir heuristic
-    mpz_class Hash_Theta2(ECP2 IPK, ECP2 R, ECP2 rho, ECP CRED_prime_1, ECP mu, ECP2 R_rho, ECP R_mu) {
-        octet hash = getOctet(4096);
-        octet temp = getOctet(512);
-
-        // Append G2 points
-        ECP2* points_g2[] = {&IPK, &R, &rho, &R_rho};
-        for (int i = 0; i < 4; ++i) {
-            ECP2_toOctet(&temp, points_g2[i], true);
-            concatOctet(&hash, &temp);
-        }
-
-        // Append G1 points
-        ECP* points_g1[] = {&CRED_prime_1, &mu, &R_mu};
-        for (int i = 0; i < 3; ++i) {
-            ECP_toOctet(&temp, points_g1[i], true);
-            concatOctet(&hash, &temp);
-        }
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val); free(temp.val);
-        return BIG_to_mpz(ret);
-    }
 
     NIZK_Theta2 Prove_Theta2(DtacbParams& pp, mpz_class m, mpz_class alpha, ECP2 R, ECP2 IPK, ECP2 rho, ECP CRED_prime_1, ECP mu) {
         NIZK_Theta2 proof;
@@ -158,7 +109,7 @@ namespace Dtacb {
         ECP_copy(&R_mu, &CRED_prime_1); ECP_mul(R_mu, r_alpha);
 
         // 3. Compute Fiat-Shamir challenge c
-        proof.c = Hash_Theta2(IPK, R, rho, CRED_prime_1, mu, R_rho, R_mu);
+        proof.c = HashToZp(IPK, R, rho, CRED_prime_1, mu, R_rho, R_mu);
 
         // 4. Compute zero-knowledge responses
         auto calc_s = [&](mpz_class r, mpz_class x) {
@@ -199,7 +150,7 @@ namespace Dtacb {
         ECP_add(&R_mu_prime, &t3);
 
         // 2. Recompute the challenge hash and verify equality
-        mpz_class c_prime = Hash_Theta2(tok.IPK, tok.R, tok.rho, tok.CRED_prime.CRED_prime_1, tok.mu, R_rho_prime, R_mu_prime);
+        mpz_class c_prime = HashToZp(tok.IPK, tok.R, tok.rho, tok.CRED_prime.CRED_prime_1, tok.mu, R_rho_prime, R_mu_prime);
 
         return c_prime == p.c;
     }

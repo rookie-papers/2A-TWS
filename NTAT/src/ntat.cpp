@@ -15,58 +15,6 @@ namespace Ntat {
         return ((a - b) % q + q) % q;
     }
 
-    // ================= Hash Functions =================
-
-    mpz_class H1(ECP X, ECP T, ECP comm1, ECP comm2) {
-        // 1. Convert curve points (X, T, comm1, comm2) to a byte stream and hash them to a scalar
-        octet hash = getOctet(2048);
-        octet temp = getOctet(1024);
-
-        ECP_toOctet(&temp, &X, true); concatOctet(&hash, &temp);
-        ECP_toOctet(&temp, &T, true); concatOctet(&hash, &temp);
-        ECP_toOctet(&temp, &comm1, true); concatOctet(&hash, &temp);
-        ECP_toOctet(&temp, &comm2, true); concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val); free(temp.val);
-        return BIG_to_mpz(ret);
-    }
-
-    mpz_class H3(mpz_class rho, ECP Q) {
-        // 1. Hash the randomness rho and the commitment point Q to a scalar
-        octet hash = getOctet(1024);
-        octet temp = getOctet(512);
-
-        mpzToOctet(rho); concatOctet(&hash, &temp);
-        ECP_toOctet(&temp, &Q, true); concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val); free(temp.val);
-        return BIG_to_mpz(ret);
-    }
-
-    mpz_class H_Challenge(mpz_class comm, ECP sigma_prime) {
-        // 1. Fiat-Shamir heuristic: Hash the commitment and sigma_prime to generate the challenge c
-        octet hash = getOctet(1024);
-        octet temp = getOctet(512);
-
-        mpzToOctet(comm); concatOctet(&hash, &temp);
-        ECP_toOctet(&temp, &sigma_prime, true); concatOctet(&hash, &temp);
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val); free(temp.val);
-        return BIG_to_mpz(ret);
-    }
-
     // ================= Core Algorithm =================
 
     NtatParams Setup() {
@@ -160,7 +108,7 @@ namespace Ntat {
         ECP_add(&comm2, &cT);
 
         // 3.3. Compute the Fiat-Shamir challenge ch = H1(X, T, comm1, comm2)
-        mpz_class ch = H1(keys.pk_c, payload.T, comm1, comm2);
+        mpz_class ch = HashToZp(keys.pk_c, payload.T, comm1, comm2);
         mpz_class delta_inv = invert_mpz(st.delta, pp.q);
 
         // 3.4. Compute responses resp1, resp2, resp3
@@ -199,7 +147,7 @@ namespace Ntat {
         ECP_add(&comm2_prime, &chG4);
 
         // 3. Verify if the computed challenge matches the provided challenge
-        mpz_class ch_prime = H1(pk_c, query.T, comm1_prime, comm2_prime);
+        mpz_class ch_prime = HashToZp(pk_c, query.T, comm1_prime, comm2_prime);
         if (ch_prime != query.pi_c.ch) {
             cout << "[ServerIssue] Error: Pi_C verification failed!" << endl;
             resp.s = -1;
@@ -286,10 +234,10 @@ namespace Ntat {
 
         // 4. Generate a random scalar rho and compute the hash commitment comm = H3(rho, Q)
         payload.rho = rand_mpz(state_gmp) % pp.q;
-        payload.comm = H3(payload.rho, Q);
+        payload.comm = HashToZp(payload.rho, Q);
 
         // 5. Generate the Fiat-Shamir challenge c = H_Challenge(comm, sigma')
-        mpz_class c = H_Challenge(payload.comm, payload.sigma_prime);
+        mpz_class c = HashToZp(payload.comm, payload.sigma_prime);
 
         // 6. Compute the ZK responses v0, v1, v2
         payload.v0 = (alpha + (c * keys.sk_c) % pp.q) % pp.q;
@@ -312,7 +260,7 @@ namespace Ntat {
         }
 
         // 2. Reconstruct the Fiat-Shamir challenge c = H_Challenge(comm, sigma')
-        mpz_class c = H_Challenge(payload.comm, payload.sigma_prime);
+        mpz_class c = HashToZp(payload.comm, payload.sigma_prime);
 
         // 3. Reconstruct Q' = v0*G1 + v1*G3 + v2*sigma
         ECP Q_prime, v0G1, v1G3, v2Sig;
@@ -341,7 +289,7 @@ namespace Ntat {
         ECP_add(&Q_star, &c_part);
 
         // 5. Verify the hash commitment comm* == comm
-        mpz_class comm_star = H3(payload.rho, Q_star);
+        mpz_class comm_star = HashToZp(payload.rho, Q_star);
         if (comm_star != payload.comm) {
             cout << "[ServerVerify] Error: ZK Proof verification failed (comm mismatch)." << endl;
             return false;

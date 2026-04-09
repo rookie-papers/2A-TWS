@@ -80,6 +80,10 @@ namespace Dtacb {
         mpz_class s_o;   ///< Response value s_o.
     };
 
+    inline void appendToOctet(octet* hash, const NIZK_Theta1& tag) {
+        hash_recursive(hash, tag.c, tag.s_z, tag.s_m,tag.s_l,tag.s_o); // 利用递归引擎自动展开成员
+    }
+
     /**
      * @brief Registration info sent from User to Issuer.
      * Contains commitments, ciphertext, and the zero-knowledge proof Theta 1.
@@ -91,6 +95,10 @@ namespace Dtacb {
         ECP C2;             ///< Ciphertext part 2: Z^o * h^m.
         NIZK_Theta1 theta1; ///< Non-interactive zero-knowledge proof Theta 1.
     };
+
+    inline void appendToOctet(octet* hash, const RegInfo& tag) {
+        hash_recursive(hash, tag.c_m, tag.Z, tag.C1,tag.C2,tag.theta1); // 利用递归引擎自动展开成员
+    }
 
     /**
      * @brief Blinded partial credential returned by Issuer to User.
@@ -126,6 +134,10 @@ namespace Dtacb {
         ECP CRED_prime_1; ///< Randomized base component.
         ECP CRED_prime_2; ///< Randomized signature component.
     };
+
+    inline void appendToOctet(octet* hash, const RandomizedCred& tag) {
+        hash_recursive(hash, tag.CRED_prime_1, tag.CRED_prime_2); // 利用递归引擎自动展开成员
+    }
 
     /**
      * @brief NIZK Proof Theta 2 structure.
@@ -266,12 +278,6 @@ namespace Dtacb {
     vector<mpz_class> GetPolyCoeffs(mpz_class q, const vector<mpz_class>& roots);
 
     /**
-     * @brief Hash function dedicated to the batch-showing proof.
-     * @return Hash output mapped to a scalar in Zp.
-     */
-    mpz_class Hash_Batch(ECP2 CM_P, ECP2 CM_f, ECP Pi_a, ECP Pi_b, ECP T1, ECP T2, FP12 T3);
-
-    /**
      * @brief Batch-Showing algorithm (ZKBatchShow).
      * Generates a batch proof demonstrating possession of a specific number of valid credentials.
      * @param pp System public parameters.
@@ -294,43 +300,8 @@ namespace Dtacb {
     bool ZKBatchVer(DtacbParams& pp, ECP Acc, BatchProof& proof, int n);
 
     // ------------------------------
-    // Hash Functions
-    // ------------------------------
-
-    /**
-     * @brief Hash function H1.
-     * Maps the commitment c_m to a point on curve G1 to serve as the base `h`.
-     * @param c_m The message commitment point in G1.
-     * @return A valid curve point in G1.
-     */
-    ECP H1(ECP c_m);
-
-    /**
-     * @brief Hash function H2.
-     * Maps the randomized credential to Zp to generate the accumulator witness `sigma`.
-     * @param cred_prime The randomized credential structure.
-     * @return Hash output as a large integer in Zp.
-     */
-    mpz_class H2(RandomizedCred cred_prime);
-
-    // ------------------------------
     // NIZK Theta 1 Algorithms
     // ------------------------------
-
-    /**
-     * @brief Dedicated hash function for Theta 1 proof generation.
-     * Implements the Fiat-Shamir heuristic to compute the challenge for the NIZK proof.
-     * @param Z User's ElGamal public key.
-     * @param c_m Commitment to the message.
-     * @param C1 Ciphertext component 1.
-     * @param C2 Ciphertext component 2.
-     * @param R_Z Commitment to the randomness of Z.
-     * @param R_cm Commitment to the randomness of c_m.
-     * @param R_C1 Commitment to the randomness of C1.
-     * @param R_C2 Commitment to the randomness of C2.
-     * @return Hash output serving as the challenge `c` in Zp.
-     */
-    mpz_class Hash_Theta1(ECP Z, ECP c_m, ECP C1, ECP C2, ECP R_Z, ECP R_cm, ECP R_C1, ECP R_C2);
 
     /**
      * @brief Prover (User) generation of Theta 1.
@@ -360,20 +331,6 @@ namespace Dtacb {
     // ------------------------------
     // NIZK Theta 2 Algorithms
     // ------------------------------
-
-    /**
-     * @brief Dedicated hash function for Theta 2 proof generation.
-     * Implements the Fiat-Shamir heuristic to compute the challenge for the credential showing proof.
-     * @param IPK Aggregated public key of the signing issuers.
-     * @param R Aggregated randomness from the issuers.
-     * @param rho Verification helper element in G2.
-     * @param CRED_prime_1 Randomized base component of the credential.
-     * @param mu Verification helper element in G1.
-     * @param R_rho Commitment to the randomness used in rho.
-     * @param R_mu Commitment to the randomness used in mu.
-     * @return Hash output serving as the challenge `c` in Zp.
-     */
-    mpz_class Hash_Theta2(ECP2 IPK, ECP2 R, ECP2 rho, ECP CRED_prime_1, ECP mu, ECP2 R_rho, ECP R_mu);
 
     /**
      * @brief Prover (User) generation of Theta 2.

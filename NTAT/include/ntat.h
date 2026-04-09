@@ -206,32 +206,6 @@ namespace Ntat {
      */
     mpz_class mod_sub(mpz_class a, mpz_class b, mpz_class q);
 
-    /**
-     * @brief Hash function H1 used for Pi_C proof generation.
-     * @param X The client's public key.
-     * @param T The blinded commitment.
-     * @param comm1 The first commitment element.
-     * @param comm2 The second commitment element.
-     * @return Hash output serving as the challenge `ch` in Zp.
-     */
-    mpz_class H1(ECP X, ECP T, ECP comm1, ECP comm2);
-
-    /**
-     * @brief Hash function H3 used for the Redemption phase commitment.
-     * @param rho The random factor \rho.
-     * @param Q The commitment point.
-     * @return Hash output in Zp.
-     */
-    mpz_class H3(mpz_class rho, ECP Q);
-
-    /**
-     * @brief Hash function used to generate the Fiat-Shamir challenge in the Redemption phase.
-     * @param comm The hash commitment.
-     * @param sigma_prime The randomized token element.
-     * @return Hash output serving as the challenge `c` in Zp.
-     */
-    mpz_class H_Challenge(mpz_class comm, ECP sigma_prime);
-
 } // namespace Ntat
 
 #endif // NTAT_H

@@ -135,7 +135,7 @@ namespace IssuerNode {
             std::cout << "=======================================================\n" << std::endl;
 
             // Step C: Issuer computes certificate sigma_i = H_u^{a + b * m}
-            mpz_class m = DatTws::H_Tag(tag);
+            mpz_class m = HashToZp(tag);
             mpz_class sig_exp = (issuer_keys.a + issuer_keys.b * m) % pp.q;
 
             ECP sigma_i;

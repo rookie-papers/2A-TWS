@@ -10,80 +10,6 @@ namespace AtoSa {
     csprng rng;
     gmp_randstate_t state_gmp;
 
-    // ================= Helper Functions =================
-
-    // Helper: H(m) -> Zp
-    mpz_class HashMsgToZp(string msg) {
-        octet hash = getOctet(2048);
-        octet temp = getOctet(1024);
-
-        if (msg.length() > 1024) {
-            // Simple truncation for demo, strictly should hash large msgs first
-            temp.len = 1024;
-            memcpy(temp.val, msg.c_str(), 1024);
-        } else {
-            temp.len = msg.length();
-            memcpy(temp.val, msg.c_str(), temp.len);
-        }
-        concatOctet(&hash, &temp);
-
-        BIG order_big, ret;
-        BIG_rcopy(order_big, CURVE_Order); // Assuming CURVE_Order is global from library
-        hashZp256(ret, &hash, order_big);
-
-        free(hash.val);
-        free(temp.val);
-
-        return BIG_to_mpz(ret);
-    }
-
-    // Helper: H(c) -> G1 ; where c = P^rho1 || P^rho2 || (mj, vkj)...
-    ECP HashToG1(AtoSaParams pp, ECP part1, ECP part2, const vector<string>& msgs, const vector<AtoSaVK>& vks) {
-        octet hash = getOctet(4096); // Large buffer
-        octet temp = getOctet(1024);
-
-        // 1. Append P^rho1
-        ECP_toOctet(&temp, &part1, true);
-        concatOctet(&hash, &temp);
-
-        // 2. Append P^rho2
-        ECP_toOctet(&temp, &part2, true);
-        concatOctet(&hash, &temp);
-
-        // 3. Append Pairs (m_j, vk_j)
-        for(size_t i=0; i<msgs.size(); ++i) {
-            // m_j
-            string m = msgs[i];
-            if(m.length() > 512) m = m.substr(0, 512);
-            temp.len = m.length();
-            memcpy(temp.val, m.c_str(), temp.len);
-            concatOctet(&hash, &temp);
-
-            // vk_j (Y1, Y2, X)
-            ECP2_toOctet(&temp, (ECP2*)&vks[i].Y1_hat, true);
-            concatOctet(&hash, &temp);
-            ECP2_toOctet(&temp, (ECP2*)&vks[i].Y2_hat, true);
-            concatOctet(&hash, &temp);
-            ECP2_toOctet(&temp, (ECP2*)&vks[i].X_hat, true);
-            concatOctet(&hash, &temp);
-        }
-
-        BIG order, ret;
-        BIG_rcopy(order, CURVE_Order);
-        hashZp256(ret, &hash, order);
-
-        free(hash.val);
-        free(temp.val);
-
-        // Map integer to G1: h = P * hash_val
-        mpz_class h_exp = BIG_to_mpz(ret);
-        ECP h;
-        ECP_copy(&h, &pp.P);
-        ECP_mul(h, h_exp);
-
-        return h;
-    }
-
     // ================= Core Algorithm =================
 
     AtoSaParams Setup() {
@@ -134,7 +60,7 @@ namespace AtoSa {
         ECP_mul(P_rho2, tag.aux.rho2);
 
         // 3. Compute h = H(c)
-        tag.aux.h = HashToG1(pp, P_rho1, P_rho2, msgs, vks);
+        HashToG1(tag.aux.h, pp, P_rho1, P_rho2, msgs, vks);
 
         // 4. Compute Tag T = (h^rho1, h^rho2)
         ECP_copy(&tag.T1, &tag.aux.h);
@@ -153,7 +79,7 @@ namespace AtoSa {
         ECP_copy(&sig.h_prime, &tag.T1);
 
         // 2. Compute message hash m_j as integer
-        mpz_class m_val = HashMsgToZp(msg);
+        mpz_class m_val = HashToZp(msg);
 
         // 3. Compute s_j = (h^rho1)^{x + y1*m} * (h^rho2)^{y2} = T1^{x + y1*m} * T2^{y2}
 
@@ -214,7 +140,7 @@ namespace AtoSa {
         ECP2_inf(&sum1);
 
         for(size_t i=0; i<avk.size(); ++i) {
-            mpz_class m_val = HashMsgToZp(msgs[i]);
+            mpz_class m_val = HashToZp(msgs[i]);
 
             // term = Y1_hat ^ m
             ECP2 term;
