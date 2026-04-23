@@ -227,12 +227,12 @@ static void BM_DatTws_parVerify(benchmark::State &state) {
 }
 
 // ---------------------------------------------------------
-// 7. Test batchVerifyZK (Batch verifying ZK Proofs for M users)
+// 7. Test batchVerifyZK (Batch verifying ZK Proofs for M users with t_num certs each)
 // ---------------------------------------------------------
 static void BM_DatTws_batchVerifyZK(benchmark::State &state) {
     InitRNGs();
-    int M = state.range(0); // Number of signatures in the batch
-    int t_num = 5;          // Assume 5 issuers per user
+    int M = state.range(0);     // Parameter 0: Number of users in the batch
+    int t_num = state.range(1); // Parameter 1: Number of issuers/certificates per user
 
     auto pp = DatTws::Setup();
     DatTws::DatOpener opener;
@@ -259,12 +259,12 @@ static void BM_DatTws_batchVerifyZK(benchmark::State &state) {
 }
 
 // ---------------------------------------------------------
-// 8. Test batchParVerify (Batch verifying Message Sigs for M users)
+// 8. Test batchParVerify (Batch verifying Message Sigs for M users with t_num certs each)
 // ---------------------------------------------------------
 static void BM_DatTws_batchParVerify(benchmark::State &state) {
     InitRNGs();
-    int M = state.range(0);
-    int t_num = 5;
+    int M = state.range(0);     // Parameter 0: Number of users
+    int t_num = state.range(1); // Parameter 1: Number of certificates
 
     auto pp = DatTws::Setup();
     DatTws::DatOpener opener;
@@ -293,12 +293,12 @@ static void BM_DatTws_batchParVerify(benchmark::State &state) {
 }
 
 // ---------------------------------------------------------
-// 9. Test batchVerifyAll (Complete Batch Verification for M users)
+// 9. Test batchVerifyAll (Complete Batch Verification for M users with t_num certs each)
 // ---------------------------------------------------------
 static void BM_DatTws_batchVerifyAll(benchmark::State &state) {
     InitRNGs();
-    int M = state.range(0);
-    int t_num = 5;
+    int M = state.range(0);     // Parameter 0: Number of users
+    int t_num = state.range(1); // Parameter 1: Number of certificates
 
     auto pp = DatTws::Setup();
     DatTws::DatOpener opener;
@@ -327,24 +327,36 @@ static void BM_DatTws_batchVerifyAll(benchmark::State &state) {
 }
 
 // ---------------------------------------------------------
+// 10. Helper function to generate 2D parameter grid (M, t_num)
+// ---------------------------------------------------------
+static void GenerateBatchArgs(benchmark::Benchmark* b) {
+    std::vector<int> users = {4, 8, 16, 32};
+    std::vector<int> certs = {4, 8, 16, 32};
+    for (int m : users) {
+        for (int t : certs) {
+            b->Args({m, t}); // Passes {M, t_num}
+        }
+    }
+}
+
+// ---------------------------------------------------------
 // Register all Benchmark tests
 // ---------------------------------------------------------
 
-// System setup doesn't scale with N, so no arguments needed
 BENCHMARK(BM_DatTws_Setup);
 
-// Protocol phases that scale with the number of issuers
-// Testing typical scenarios: 4, 8, 16, and 32 aggregated issuers
+// Protocol phases that scale with the number of issuers (1D scaling)
 BENCHMARK(BM_DatTws_KeyGen)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Iterations(66);
 BENCHMARK(BM_DatTws_TagGen_WitGen)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Iterations(66);
 BENCHMARK(BM_DatTws_Sign)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Iterations(66);
 BENCHMARK(BM_DatTws_Verify)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Iterations(66);
 BENCHMARK(BM_DatTws_parVerify)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Iterations(66);
-// Batch verification scales with the number of USERS (M) in the batch.
-// Assuming a fixed 5 issuers per user, testing for 4, 8, 16, 32, 64 concurrent Users.
-BENCHMARK(BM_DatTws_batchVerifyZK)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Arg(64)->Iterations(20);
-BENCHMARK(BM_DatTws_batchParVerify)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Arg(64)->Iterations(20);
-BENCHMARK(BM_DatTws_batchVerifyAll)->Arg(4)->Arg(8)->Arg(16)->Arg(32)->Arg(64)->Iterations(20);
+
+// Batch verification scales with both USERS (M) and CERTIFICATES (t_num)
+// This will automatically create 16 test cases per function
+BENCHMARK(BM_DatTws_batchVerifyZK)->Apply(GenerateBatchArgs)->Iterations(20);
+BENCHMARK(BM_DatTws_batchParVerify)->Apply(GenerateBatchArgs)->Iterations(20);
+BENCHMARK(BM_DatTws_batchVerifyAll)->Apply(GenerateBatchArgs)->Iterations(20);
 
 // ---------------------------------------------------------
 // Benchmark main entry point

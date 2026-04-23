@@ -8,6 +8,7 @@
 
 using namespace std;
 
+/*
 int main() {
     // ============================================
     // 1. Initialization
@@ -184,6 +185,7 @@ int main() {
 
     return 0;
 }
+*/
 
 
 
@@ -493,4 +495,4 @@ BENCHMARK(BM_Dtacb_ZKBatchVer)->Args({4, 4})->Args({8, 8})->Args({16, 16})->Args
 // ---------------------------------------------------------
 // Benchmark main entry point
 // ---------------------------------------------------------
-//BENCHMARK_MAIN();
+BENCHMARK_MAIN();
